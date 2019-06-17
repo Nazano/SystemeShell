@@ -8,7 +8,7 @@
 #include <string.h>
 
 //------------------------------------------------
-// Fonction cp (copy). Attend la ligne d'argument
+// Commande interne cp (copy). Attend la ligne d'argument
 // correspondant à l'appel de cette commande
 //------------------------------------------------
 int cp(char** argv){
@@ -133,3 +133,22 @@ void cp_retcode_handle(const int id){
         printf("Nombre d'arguments invalides pour la fonction cp\n Format: cp <source> <destination>\n");
 }
 
+//------------------------------------------------
+// Commande interne cat. Affiche sur l'entrée standard
+// le contenu du fichier passé en argument
+//------------------------------------------------
+int cat(const char* path){
+    FILE *source;
+    int c;
+    if((source = fopen(path,  "r")) == NULL) {
+        return -1;
+    }   
+
+    while((c = fgetc(source)) != EOF){
+        fputc( c, stdout);
+    }
+
+    fclose(source);
+
+    return 0;
+}
