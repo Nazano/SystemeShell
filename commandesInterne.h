@@ -6,7 +6,7 @@ int cp_file(char*, char*);
 int cp_directory(char*, char*);
 void cp_retcode_handle(const int);
 int cat(const char*);
-void ls();
+int ls(const char*, const char**, const int);
 void find();
 
 char* concat(const char*, const char*);

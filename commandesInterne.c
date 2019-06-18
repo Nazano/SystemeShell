@@ -35,7 +35,6 @@ int cp_directory(char* source, char* destination){
     struct dirent *dp;
     struct stat st = {0};
     char * file_name;
-    int retCode;
 
     if((directory = opendir(source)) == NULL){
          return -1;
@@ -150,5 +149,102 @@ int cat(const char* path){
 
     fclose(source);
 
+    return 0;
+}
+
+int ls(const char* path, const char** options, const int opt_size){
+    DIR *directory;
+    struct dirent *dp;
+    
+    int is_a = -1, is_l = -1;
+    for(size_t i = 0; i<opt_size; i++){
+        if(strstr(options[i], "a") != NULL)
+            is_a = 0;
+        else if(strstr(options[i], "l") != NULL)
+            is_l = 0;
+    }
+
+    if((directory = opendir(path)) == NULL){
+         return -1;
+    }
+    
+    struct stat filestat;
+    int nb_files = 0;
+
+    while((dp = readdir(directory)) != NULL) { 
+        nb_files++;
+    }
+    char* files_names[nb_files];
+
+
+    if((directory = opendir(path)) == NULL){
+         return -1;
+    }
+
+    size_t j = 0;
+    if( !is_a ){ //Option -a activé
+        while((dp = readdir(directory)) != NULL) { 
+            if(isDirectory(dp->d_name))
+                files_names[j] = concat(dp->d_name, "/");
+            else
+                files_names[j] = dp->d_name;
+            j++;
+        }
+    }
+    else{
+        while((dp = readdir(directory)) != NULL) { 
+            if( !(!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))){
+                if(isDirectory(dp->d_name))
+                    files_names[j] = concat(dp->d_name, "/");
+                else
+                    files_names[j] = dp->d_name;
+                j++;
+            }
+        }
+    }
+
+
+    if( !is_l ){
+
+        printf("Protection\tTaille\tLiens\tUID\tNom fichier\n");
+        for (size_t i = 0; i < nb_files; i++)
+        {
+            stat(files_names[i], &filestat);
+            //Permissions
+            printf( (S_ISDIR(filestat.st_mode)) ? "d" : "-");
+            printf( (filestat.st_mode & S_IRUSR) ? "r" : "-");
+            printf( (filestat.st_mode & S_IWUSR) ? "w" : "-");
+            printf( (filestat.st_mode & S_IXUSR) ? "x" : "-");
+            printf( (filestat.st_mode & S_IRGRP) ? "r" : "-");
+            printf( (filestat.st_mode & S_IWGRP) ? "w" : "-");
+            printf( (filestat.st_mode & S_IXGRP) ? "x" : "-");
+            printf( (filestat.st_mode & S_IROTH) ? "r" : "-");
+            printf( (filestat.st_mode & S_IWOTH) ? "w" : "-");
+            printf( (filestat.st_mode & S_IXOTH) ? "x" : "-");
+            printf("\t");
+            printf("%ld",filestat.st_size);
+            printf("\t");
+            printf("%d",filestat.st_nlink);
+            printf("\t");
+            printf("%d",filestat.st_uid);
+            printf("\t");
+            printf("%s",files_names[i]);
+            printf("\n");
+
+        }
+        
+    }
+    else
+    {
+        for (size_t i = 0; i < nb_files; i++)
+        {
+            printf("%s",files_names[i]);
+            printf("\n");
+
+        }
+    }
+    
+    
+    
     return 0;
 }
