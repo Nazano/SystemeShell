@@ -106,6 +106,19 @@ char* concat(const char* s1, const char* s2)
 }
 
 //------------------------------------------------
+// Concatène deux caractères en une chaine de caractères.
+//------------------------------------------------
+char* concat_carac(const char s1, const char s2)
+{
+    char *str=malloc(2*sizeof(char));
+    if(str==NULL)
+        return NULL;
+    str[0]=s1;
+    str[1]=s2;
+    return str;
+}
+
+//------------------------------------------------
 // Vérifie que le path coresspond bien à un fichier 
 //------------------------------------------------
 int isFile(const char* path){
@@ -137,12 +150,12 @@ void cp_retcode_handle(const int id){
 
 //------------------------------------------------
 // Commande interne cat. Affiche sur l'entrée standard
-// le contenu du fichier passé en argument
+// le contenu du fichier passé en argument.
 //------------------------------------------------
-int cat(const char* path){
+int cat(const char** argv){
     FILE *source;
     int c;
-    if((source = fopen(path,  "r")) == NULL) {
+    if((source = fopen(argv[1],  "r")) == NULL) {
         return -1;
     }   
 
@@ -160,7 +173,37 @@ int cat(const char* path){
 // donné. path : chemin vers le fichier, options : a et
 // l supportés, opt_size : nombre d'options
 //------------------------------------------------
-int ls(const char* path, const char** options, const int opt_size){
+int ls(char** argv, int argc){
+
+    char* path = argv[1];
+    int opt_size = 0;
+
+    if(argc < 2)
+        ls_error();
+    
+    if(argc > 2){
+        if(argv[2][0] == '-'){
+            while (argv[2][opt_size + 1] != '\0') {
+                opt_size++;
+            }
+        }
+        else{
+            ls_error();
+        }
+    }
+    printf("optsize = %d\n", opt_size);
+    
+    char* options[opt_size];
+    
+    for (size_t i = 1; i < (opt_size + 1); i++) {
+        options[i-1] = concat_carac(argv[2][i], '\0');
+    }
+    
+    for (size_t i = 0; i < opt_size; i++) {
+        printf("%s\n", options[i]);
+    }
+
+    
     DIR *directory;
     struct dirent *dp;
     
@@ -252,48 +295,163 @@ int ls(const char* path, const char** options, const int opt_size){
         }
     }
     
-    
-    
     return 0;
 }
 
-int find(char** argv, int nb){
-	char* target = argv[2];
-	size_t buffer_size = 1000;
-	char* source[buffer_size];
-	getcwd(source, buffer_size);
-	
-    chercher(target, source);
-	
-    return 0;
-	
+//------------------------------------------------
+// Message d'erreur ls
+//------------------------------------------------
+void ls_error(){
+    printf("ls <path> <options>\n Les options doivent être de la forme (-a, -l, -al, -la)\n");
+    exit(1);
 }
 
-int chercher(char* target, char* source){
-	source = concat(source, "/");
 
-    DIR *directory;
-    struct dirent *dp;
-    struct stat st = {0};
-    char * file_name;
+enum
+{
+    NAME,
+    EXEC,
+    NOEXPR,
+};
+typedef  struct
+{
+    int type;
+    const char *motif;
+} expression;
 
-    if((directory = opendir(source)) == NULL){
-         return -1;
+//------------------------------------------------
+// -exec appelé. Appelle find avec le résultat de
+// l'expression.
+//------------------------------------------------
+int executable(const struct stat *buf){
+    return ((buf->st_mode & S_IXUSR) == S_IXUSR) || ((buf->st_mode & S_IXGRP) == S_IXGRP) || ((buf->st_mode & S_IXOTH) == S_IXOTH);
+}
+
+//------------------------------------------------
+// -name appelé. Affichie retourne vrai si le nom
+// du fichier correspond exactement au pattern.
+//------------------------------------------------
+int file_name_match(const char *path, const char *pattern){
+    return strcmp(strrchr(path,'/')+1,pattern) == 0;
+}
+
+//------------------------------------------------
+// Aucune expression passée en argument. Retourne vrai
+// si le nom du fichier est contenu dans le pattern.
+//------------------------------------------------
+int all_match(const char *path, const char *pattern){
+    return strstr(strrchr(path,'/')+1, pattern) != NULL;
+}
+
+//------------------------------------------------
+// Traite un fichier passé en paramètre. L'évalue en
+// fonction de l'expression associée.
+//------------------------------------------------
+
+void check_file(const char* path, const expression *exp){
+    struct stat file;
+    stat(path, &file);
+    
+    switch(exp->type){
+        case NAME:
+            if(file_name_match(path,exp->motif))
+                printf("%s\n", path);
+            break;
+        case EXEC:
+            if(executable(&file))
+                printf("%s\n", path);
+            break;
+        case NOEXPR:
+            if(all_match(path, exp->motif))
+                printf("%s\n", path);
+            break;
     }
+}
 
-    while((dp = readdir(directory)) != NULL) {
-        //printf("debug: %s, target: %s\n", dp->d_name, target);
-        if( !(!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))){
-        	file_name = concat(source, dp->d_name);
-            if(target == dp->d_name){
-            	printf("Possible match: %s\n", concat(source, dp->d_name));
-			}
-            if(isDirectory(file_name)){
-            	printf("Répertoire: %s\n", file_name);
-                chercher(target, concat(source, dp->d_name));
-			}
+//------------------------------------------------
+// Parcours de répertoire récursif. Traite chaque élément.
+// Si c'est un fichier apelle traiter_fichier(),
+// sinon s'apelle sur le répertoire.
+//------------------------------------------------
+void read_dir(const char* path, const expression *exp){
+    DIR *dir = opendir(path);
+    struct dirent *entry;
+    struct stat dir_stat;
+    
+    if (!dir) {
+        perror(path);
+        return;
+    }
+    
+    while((entry = readdir(dir)) != NULL){
+        char buff[strlen(path)+strlen(entry->d_name)+2];
+        sprintf(buff,"%s/%s",path,entry->d_name);
+        stat(buff, &dir_stat);
+        
+        if(strcmp(entry->d_name,"..") != 0){
+            if(((dir_stat.st_mode & S_IFMT) == S_IFDIR)  && strcmp(entry->d_name, ".") != 0)
+                read_dir(buff, exp);
+            else
+                check_file(buff, exp);
         }
     }
-    closedir(directory);
+    closedir(dir);
+}
+
+//------------------------------------------------
+// Message d'erreur pour la commande find
+//------------------------------------------------
+void find_error(){
+    printf("find <path> <expression>\nexpression :\n-name <name>\n-exec\n");
+    exit(1);
+}
+
+//------------------------------------------------
+// Commande interne find. Appel find <path> <expression>
+// Supporte -name et -exec. find <path> <pattern> trouve
+// toutes les noms de fichiers contenant le pattern dans leur
+// nom.
+// Si -name ou -exec utilisé trouve la première occurence.
+//------------------------------------------------
+
+int find(char** argv, int argc){
+    if(argc < 2)
+        find_error();
+    
+    int definedExpression = 0;
+    int i = 1;
+    char *path;
+    expression exp;
+    
+    path = argv[i];
+        
+    i++;
+
+    while(i < argc){
+        if(argv[i][0] == '-' && !definedExpression){
+            if(strcmp(argv[i]+1, "name") == 0)
+                exp.type = NAME;
+            else if(strcmp(argv[i]+1, "executable") == 0)
+                exp.type = EXEC;
+          
+            definedExpression = 1;
+        } else if (definedExpression){
+            switch(exp.type){
+                case NAME:
+                    exp.motif = argv[i];
+                    break;
+                default:
+                    find_error();
+                    break;
+            }
+        } else {
+            exp.type = NOEXPR;
+            exp.motif = argv[i];
+        }
+        i++;
+    }
+    read_dir(path, &exp);
+    
     return 0;
+	
 }
