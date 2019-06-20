@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
+
+#define _POSIX_SOURCE
 
 //------------------------------------------------
 // Commande interne cp (copy). Attend la ligne d'argument
@@ -41,7 +44,7 @@ int cp_directory(char* source, char* destination){
     }
 
     if(stat(destination, &st) == -1){
-        mkdir(destination);
+        mkdir(destination, 0700);
     }
 
     while((dp = readdir(directory)) != NULL) {
@@ -152,6 +155,11 @@ int cat(const char* path){
     return 0;
 }
 
+//------------------------------------------------
+// Commande interne ls. Affiche le contenu du répertoire
+// donné. path : chemin vers le fichier, options : a et
+// l supportés, opt_size : nombre d'options
+//------------------------------------------------
 int ls(const char* path, const char** options, const int opt_size){
     DIR *directory;
     struct dirent *dp;
@@ -246,5 +254,46 @@ int ls(const char* path, const char** options, const int opt_size){
     
     
     
+    return 0;
+}
+
+int find(char** argv, int nb){
+	char* target = argv[2];
+	size_t buffer_size = 1000;
+	char* source[buffer_size];
+	getcwd(source, buffer_size);
+	
+    chercher(target, source);
+	
+    return 0;
+	
+}
+
+int chercher(char* target, char* source){
+	source = concat(source, "/");
+
+    DIR *directory;
+    struct dirent *dp;
+    struct stat st = {0};
+    char * file_name;
+
+    if((directory = opendir(source)) == NULL){
+         return -1;
+    }
+
+    while((dp = readdir(directory)) != NULL) {
+        //printf("debug: %s, target: %s\n", dp->d_name, target);
+        if( !(!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))){
+        	file_name = concat(source, dp->d_name);
+            if(target == dp->d_name){
+            	printf("Possible match: %s\n", concat(source, dp->d_name));
+			}
+            if(isDirectory(file_name)){
+            	printf("Répertoire: %s\n", file_name);
+                chercher(target, concat(source, dp->d_name));
+			}
+        }
+    }
+    closedir(directory);
     return 0;
 }

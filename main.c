@@ -9,6 +9,8 @@
 #include <sys/wait.h>
 #include <pwd.h>
 
+#include "commandesInterne.c"
+
 void getLine(char* line_, int* lineSz_)
 {
     /*
@@ -101,11 +103,15 @@ int main(int argc, char** argv)
     strcpy(login, (*getpwuid(getuid())).pw_name);
     gethostname(host, sizeof(host));
     getcwd(cwd, sizeof(cwd));
-
-	while (true)
-	{
+	
+	
+	char* opt[] = {};
+		size_t s = 0;
+		ls(argv[1], opt, s);
+	//while (true)
+	//{
 		// Afficher invite
-		printf("%s@%s:%s%s", login, host, cwd, invite);
+		/*printf("%s@%s:%s%s", login, host, cwd, invite);
         
 		char* line = (char *)calloc(1, sizeof(char)); // calloc alloue une case mémoire contenant '\0'
 		int line_sz = 0; // taille actuelle de line (sans le '\0' final)
@@ -118,7 +124,7 @@ int main(int argc, char** argv)
 		getTokens(args_array, line, &ntok_read, &args_sz); // Sépare la ligne en tokens
         
 
-        printf("END TOKENS:\n");
-
-    }
+        printf("END TOKENS:\n");*/
+		find(argv, argc);
+    //}
 }

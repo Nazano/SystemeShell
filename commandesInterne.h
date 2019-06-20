@@ -7,10 +7,14 @@ int cp_directory(char*, char*);
 void cp_retcode_handle(const int);
 int cat(const char*);
 int ls(const char*, const char**, const int);
-void find();
+int find(char** , int );
+int chercher(char* , char* );
 
 char* concat(const char*, const char*);
 int isFile(const char*);
 int isDirectory(const char*);
+
+
+
 
 #endif
